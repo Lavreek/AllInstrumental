@@ -1,0 +1,18 @@
+{
+    "name": "user/excel",
+    "autoload": {
+        "psr-4": {
+            "User\\Excel\\": "src/"
+        }
+    },
+    "authors": [
+        {
+            "name": "lavreek",
+            "email": "lavreeksolacki@yandex.ru"
+        }
+    ],
+    "require": {
+    	"ext-zip": "*",
+        "phpoffice/phpspreadsheet": "^1.28"
+    }
+}
