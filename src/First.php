@@ -21,16 +21,20 @@ $nds = 1.2;
 $header = [];
 $priceCol = 0;
 
+$currencyArray = [];
+
+$currencyArray += ['RUB' => 1];
+
 $usdStream = fopen('http://fluid-line.ru/curr_usd.txt', "r");
-$usd = stream_get_contents($usdStream);
+$currencyArray += ['USD' => stream_get_contents($usdStream)];
 fclose($usdStream);
 
 $euroStream = fopen('http://fluid-line.ru/curr_eur.txt', "r");
-$euro = stream_get_contents($euroStream);
+$currencyArray += ['EUR' => stream_get_contents($euroStream)];
 fclose($euroStream);
 
 $gbpStream = fopen('http://fluid-line.ru/curr_gbp.txt', "r");
-$gbp = stream_get_contents($gbpStream);
+$currencyArray += ['GBP' => stream_get_contents($gbpStream)];
 fclose($gbpStream);
 
 function getRealCol(int $index) : string
@@ -57,15 +61,42 @@ foreach ($sheetData as $row => $values) {
     } else {
         $xslxProductName = $values[2];
 
-        $warehouse = fopen(dirname(__DIR__) . "/resources/tovarnasklade.csv", "r");
+        $warehouse = fopen(dirname(__DIR__) . "/resources/tovarnaskladeprice.csv", "r");
 
         while ($data = fgetcsv($warehouse, separator: "\t")) {
-            if (isset($data[0], $data[1]/*, $data[2], $data[3]*/)) {
-                $product = ['title' => $data[0], 'count' => $data[1]/*, 'price' => $data[2], 'currency' => $data[3]*/];
+            if (isset($data[0], $data[1])) {
+                if (!isset($data[3])) {
+                    $currency = "RUB";
+                } else {
+                    $currency = $data[3];
+
+                    if (empty($data[3])) {
+                        $currency = "RUB";
+                    }
+                }
+
+                if (!isset($data[2])) {
+                    $price = 0;
+                } else {
+                    $price = $data[2];
+                    if (empty($data[2])) {
+                        $price = 0;
+                    }
+                }
+
+                $product = ['title' => $data[0], 'count' => $data[1]];
 
                 if ($product['title'] == $xslxProductName) {
                     $activeSheet->setCellValue($newCountCol . ($row + 1), $product['count']);
-                    // $activeSheet->setCellValue($newPriceCol . ($row + 1), $product['price'] * $nds);
+
+                    $sum = str_replace(',', '.', $price) * $currencyArray[$currency] * $nds;
+                    $format = number_format($sum, 2, decimal_separator: '.', thousands_separator: '');
+
+                    $activeSheet->setCellValueExplicit(
+                        $newPriceCol . ($row + 1),
+                        str_replace(',', '.', $format),
+                        PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING
+                    );
                 }
             }
         }
