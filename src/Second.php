@@ -1,12 +1,15 @@
 <?php
 
+define('ROOT', dirname(__DIR__));
+
 require_once dirname(__DIR__) . "/vendor/autoload.php";
 
 use PhpOffice\PhpSpreadsheet\IOFactory;
 use PhpOffice\PhpSpreadsheet\Reader\Xlsx as Reader;
 
-$readerInputFile = dirname(__DIR__) . "/resources/New-10-05-lerdata.xls";
-$writerOutputFile = dirname(__DIR__) . "/resources/NEW-New-10-05-lerdata.xlsx";
+$readerInputFile = ROOT . "/resources/lerdata-shablon.xls";
+$writerOutputFile = ROOT . "/processed/prikat-lerdata-" . date("d-m-Y--H-i-s") . ".xlsx";
+$editLog = file_put_contents(ROOT . "/logs/lerdata.log", "Start: " . date("H:i:s d-m-Y") . "\n");
 
 $reader = new Reader();
 $reader = IOFactory::createReader('Xls');
@@ -21,21 +24,12 @@ $nds = 1.2;
 $header = [];
 $priceCol = 0;
 
-$currencyArray = [];
+$currencyFolder = ROOT . "/currency/";
 
-$currencyArray += ['RUB' => 1];
-
-$usdStream = fopen('http://fluid-line.ru/curr_usd.txt', "r");
-$currencyArray += ['USD' => stream_get_contents($usdStream)];
-fclose($usdStream);
-
-$euroStream = fopen('http://fluid-line.ru/curr_eur.txt', "r");
-$currencyArray += ['EUR' => stream_get_contents($euroStream)];
-fclose($euroStream);
-
-$gbpStream = fopen('http://fluid-line.ru/curr_gbp.txt', "r");
-$currencyArray += ['GBP' => stream_get_contents($gbpStream)];
-fclose($gbpStream);
+$currencyArray = ['RUB' => 1];
+$currencyArray += ['USD' => file_get_contents($currencyFolder . "curr_usd.txt")];
+$currencyArray += ['EUR' => file_get_contents($currencyFolder . "curr_eur.txt")];
+$currencyArray += ['GBP' => file_get_contents($currencyFolder . "curr_gbp.txt")];
 
 function getRealCol(int $index) : string
 {
@@ -60,17 +54,26 @@ foreach ($sheetData as $row => $values) {
 
         $newPriceCol = getRealCol(array_search('Цена продукта без НДС', $header));
         $newPriceNDSCol = getRealCol(array_search('Цена продукта c НДС', $header));
-        $newPriceRealCol = getRealCol(array_search('Рекомендованная розничная цена g', $header));
+        $newPriceRealCol = getRealCol(array_search('Рекомендованная розничная цена ', $header));
         $newCountCol = getRealCol(array_search('Кол-во в упаковке', $header));
         $newTitleCol = array_search('Артикул поставщика', $header);
 
     } else {
         $xslxProductName = $values[$newTitleCol];
 
-        $warehouse = fopen(dirname(__DIR__) . "/resources/tovarnaskladeprice.csv", "r");
+        $warehouse = fopen(ROOT . "/price/tovarnaskladeprice.csv", "r");
 
         while ($data = fgetcsv($warehouse, separator: "\t")) {
             if (isset($data[0], $data[1])) {
+                if (!isset($data[2])) {
+                    $price = 0;
+                } else {
+                    $price = $data[2];
+                    if (empty($data[2])) {
+                        $price = 0;
+                    }
+                }
+
                 if (!isset($data[3])) {
                     $currency = "RUB";
                 } else {
@@ -81,18 +84,11 @@ foreach ($sheetData as $row => $values) {
                     }
                 }
 
-                if (!isset($data[2])) {
-                    $price = 0;
-                } else {
-                    $price = $data[2];
-                    if (empty($data[2])) {
-                        $price = 0;
-                    }
-                }
-
                 $product = ['title' => $data[0], 'count' => $data[1]];
 
                 if ($product['title'] == $xslxProductName) {
+                    $editLog = file_put_contents(ROOT . "/logs/lerdata.log", "ENTERED: " . $xslxProductName . "\n", FILE_APPEND);
+
                     $activeSheet->setCellValue($newCountCol . ($row + 1), $product['count']);
 
                     $sum = str_replace(',', '.', $price) * $currencyArray[$currency];
@@ -116,9 +112,14 @@ foreach ($sheetData as $row => $values) {
                         str_replace(',', '.', number_format($sum, 2, thousands_separator: '')),
                         PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING
                     );
+
+                    $editLog = file_put_contents(ROOT . "/logs/lerdata.log", "EDITED: " . $xslxProductName . "\n", FILE_APPEND);
+                    break;
                 }
             }
         }
+
+        fclose($warehouse);
     }
 }
 

@@ -1,12 +1,15 @@
 <?php
 
-require_once dirname(__DIR__) . "/vendor/autoload.php";
+define('ROOT', dirname(__DIR__));
+
+require_once ROOT . "/vendor/autoload.php";
 
 use PhpOffice\PhpSpreadsheet\IOFactory;
 use PhpOffice\PhpSpreadsheet\Reader\Xlsx as Reader;
 
-$readerInputFile = dirname(__DIR__) . "/resources/SuperAFlow-HyLok-_08.06.23.xlsx";
-$writerOutputFile = dirname(__DIR__) . "/resources/NEW-SuperAFlow-HyLok-_08.06.23.xlsx";
+$readerInputFile = ROOT . "/resources/SuperAFlow-HyLok-_08.06.23.xlsx";
+$writerOutputFile = ROOT . "/processed/prikat-vseinsrumenti-" . date("d-m-Y--H-i-s") . ".xlsx";
+$editLog = file_put_contents(ROOT . "/logs/vseinsrumenti.log", "Start: " . date("H:i:s d-m-Y") . "\n");
 
 $reader = new Reader();
 $reader = IOFactory::createReader('Xlsx');
@@ -21,21 +24,12 @@ $nds = 1.2;
 $header = [];
 $priceCol = 0;
 
-$currencyArray = [];
+$currencyFolder = ROOT . "/currency/";
 
-$currencyArray += ['RUB' => 1];
-
-$usdStream = fopen('http://fluid-line.ru/curr_usd.txt', "r");
-$currencyArray += ['USD' => stream_get_contents($usdStream)];
-fclose($usdStream);
-
-$euroStream = fopen('http://fluid-line.ru/curr_eur.txt', "r");
-$currencyArray += ['EUR' => stream_get_contents($euroStream)];
-fclose($euroStream);
-
-$gbpStream = fopen('http://fluid-line.ru/curr_gbp.txt', "r");
-$currencyArray += ['GBP' => stream_get_contents($gbpStream)];
-fclose($gbpStream);
+$currencyArray = ['RUB' => 1];
+$currencyArray += ['USD' => file_get_contents($currencyFolder . "curr_usd.txt")];
+$currencyArray += ['EUR' => file_get_contents($currencyFolder . "curr_eur.txt")];
+$currencyArray += ['GBP' => file_get_contents($currencyFolder . "curr_gbp.txt")];
 
 function getRealCol(int $index) : string
 {
@@ -50,6 +44,7 @@ function getRealCol(int $index) : string
 
 $newPriceCol = 0;
 $newCountCol = 0;
+$newTitleCol = 0;
 
 foreach ($sheetData as $row => $values) {
     if ($row === 0) {
@@ -57,11 +52,12 @@ foreach ($sheetData as $row => $values) {
 
         $newPriceCol = getRealCol(array_search('Новая РРЦ', $header));
         $newCountCol = getRealCol(array_search('Количество', $header));
+        $newTitleCol = array_search('Артикул', $header);
 
     } else {
-        $xslxProductName = $values[2];
+        $xslxProductName = $values[$newTitleCol];
 
-        $warehouse = fopen(dirname(__DIR__) . "/resources/tovarnaskladeprice.csv", "r");
+        $warehouse = fopen(ROOT . "/price/tovarnaskladeprice.csv", "r");
 
         while ($data = fgetcsv($warehouse, separator: "\t")) {
             if (isset($data[0], $data[1])) {
@@ -87,6 +83,8 @@ foreach ($sheetData as $row => $values) {
                 $product = ['title' => $data[0], 'count' => $data[1]];
 
                 if ($product['title'] == $xslxProductName) {
+                    $editLog = file_put_contents(ROOT . "/logs/vseinsrumenti.log", "ENTERED: " . $xslxProductName . "\n", FILE_APPEND);
+
                     $activeSheet->setCellValue($newCountCol . ($row + 1), $product['count']);
 
                     $sum = str_replace(',', '.', $price) * $currencyArray[$currency] * $nds;
@@ -97,9 +95,13 @@ foreach ($sheetData as $row => $values) {
                         str_replace(',', '.', $format),
                         PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING
                     );
+
+                    $editLog = file_put_contents(ROOT . "/logs/vseinsrumenti.log", "EDITED: " . $xslxProductName . "\n", FILE_APPEND);
                 }
             }
         }
+
+        fclose($warehouse);
     }
 }
 

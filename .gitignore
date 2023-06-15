@@ -1,3 +1,7 @@
 .idea
+/currency
+/logs
+/price
+/processed
 /resources
 /vendor
