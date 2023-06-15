@@ -184,7 +184,10 @@ foreach ($sheetData as $row => $values) {
             }
 
             fclose($default);
+            continue;
         }
+
+        $editLog = file_put_contents(ROOT . "/logs/lerdata.log", "NOT EDITED: " . $xslxProductName . "\n", FILE_APPEND);
     }
 }
 
