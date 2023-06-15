@@ -42,20 +42,22 @@ function getRealCol(int $index) : string
     return $default;
 }
 
-$newPriceCol = 0;
-$newPriceNDSCol = 0;
-$newPriceRealCol = 0;
 $newCountCol = 0;
+$newPriceWithoutNDS = 0;
+$newPriceNDS = 0;
+$newPriceRecommended = 0;
 $newTitleCol = 0;
 
 foreach ($sheetData as $row => $values) {
     if ($row === 0) {
         $header = array_unique($values);
 
-        $newPriceCol = getRealCol(array_search('Цена продукта без НДС', $header));
-        $newPriceNDSCol = getRealCol(array_search('Цена продукта c НДС', $header));
-        $newPriceRealCol = getRealCol(array_search('Рекомендованная розничная цена ', $header));
         $newCountCol = getRealCol(array_search('Кол-во в упаковке', $header));
+
+        $newPriceWithoutNDS = getRealCol(array_search('Цена продукта без НДС', $header));
+        $newPriceNDS = getRealCol(array_search('Цена продукта c НДС', $header));
+        $newPriceRecommended = getRealCol(array_search('Рекомендованная розничная цена ', $header));
+
         $newTitleCol = array_search('Артикул поставщика', $header);
 
     } else {
@@ -95,25 +97,23 @@ foreach ($sheetData as $row => $values) {
 
                     $activeSheet->setCellValue($newCountCol . ($row + 1), $product['count']);
 
-                    $sum = str_replace(',', '.', $price) * $currencyArray[$currency];
-                    $sumNDS = $sum * $nds;
-
+                    $recommendedPrice = str_replace(',', '.', $price) * $currencyArray[$currency];
 
                     $activeSheet->setCellValueExplicit(
-                        $newPriceCol . ($row + 1),
-                        str_replace(',', '.', number_format($sum, 2, thousands_separator: '')),
+                        $newPriceWithoutNDS . ($row + 1),
+                        str_replace(',', '.', number_format(($recommendedPrice / 1.24) / 1.2, 2, thousands_separator: '')),
                         PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING
                     );
 
                     $activeSheet->setCellValueExplicit(
-                        $newPriceNDSCol . ($row + 1),
-                        str_replace(',', '.', number_format($sumNDS, 2, thousands_separator: '')),
+                        $newPriceNDS . ($row + 1),
+                        str_replace(',', '.', number_format($recommendedPrice / 1.24, 2, thousands_separator: '')),
                         PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING
                     );
 
                     $activeSheet->setCellValueExplicit(
-                        $newPriceRealCol . ($row + 1),
-                        str_replace(',', '.', number_format($sum, 2, thousands_separator: '')),
+                        $newPriceRecommended . ($row + 1),
+                        str_replace(',', '.', number_format($recommendedPrice, 2, thousands_separator: '')),
                         PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING
                     );
 
@@ -157,12 +157,23 @@ foreach ($sheetData as $row => $values) {
 
                         $activeSheet->setCellValue($newCountCol . ($row + 1), $product['count']);
 
-                        $sum = str_replace(',', '.', $price) * $currencyArray[$currency] * $nds;
-                        $format = number_format($sum, 2, decimal_separator: '.', thousands_separator: '');
+                        $recommendedPrice = str_replace(',', '.', $price) * $currencyArray[$currency];
 
                         $activeSheet->setCellValueExplicit(
-                            $newPriceCol . ($row + 1),
-                            str_replace(',', '.', $format),
+                            $newPriceWithoutNDS . ($row + 1),
+                            str_replace(',', '.', number_format(($recommendedPrice / 1.24) / 1.2, 2, thousands_separator: '')),
+                            PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING
+                        );
+
+                        $activeSheet->setCellValueExplicit(
+                            $newPriceNDS . ($row + 1),
+                            str_replace(',', '.', number_format($recommendedPrice / 1.24, 2, thousands_separator: '')),
+                            PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING
+                        );
+
+                        $activeSheet->setCellValueExplicit(
+                            $newPriceRecommended . ($row + 1),
+                            str_replace(',', '.', number_format($recommendedPrice, 2, thousands_separator: '')),
                             PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING
                         );
 
