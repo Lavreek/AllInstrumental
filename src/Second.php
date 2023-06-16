@@ -7,12 +7,12 @@ require_once dirname(__DIR__) . "/vendor/autoload.php";
 use PhpOffice\PhpSpreadsheet\IOFactory;
 use PhpOffice\PhpSpreadsheet\Reader\Xlsx as Reader;
 
-$readerInputFile = ROOT . "/resources/last-shablon-lerdata.xlsx";
+$readerInputFile = ROOT . "/resources/lerdata.xls";
 $writerOutputFile = ROOT . "/processed/prikat-lerdata-" . date("d-m-Y--H-i-s") . ".xlsx";
 $editLog = file_put_contents(ROOT . "/logs/lerdata.log", "Start: " . date("H:i:s d-m-Y") . "\n");
 
 $reader = new Reader();
-$reader = IOFactory::createReader('Xlsx');
+$reader = IOFactory::createReader('Xls');
 
 $spreadsheet = $reader->load($readerInputFile);
 
@@ -52,7 +52,7 @@ foreach ($sheetData as $row => $values) {
     if ($row === 0) {
         $header = array_unique($values);
 
-        $newCountCol = getRealCol(array_search('Кол-во в упаковке', $header));
+        $newCountCol = getRealCol(array_search('Максимальное кол-во заказа', $header));
 
         $newPriceWithoutNDS = getRealCol(array_search('Цена продукта без НДС', $header));
         $newPriceNDS = getRealCol(array_search('Цена продукта c НДС', $header));
