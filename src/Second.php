@@ -19,17 +19,8 @@ $spreadsheet = $reader->load($readerInputFile);
 $activeSheet = $spreadsheet->getActiveSheet();
 $sheetData = $activeSheet->toArray();
 
-$nds = 1.2;
-
 $header = [];
 $priceCol = 0;
-
-$currencyFolder = ROOT . "/currency/";
-
-$currencyArray = ['RUB' => 1];
-$currencyArray += ['USD' => file_get_contents($currencyFolder . "curr_usd.txt")];
-$currencyArray += ['EUR' => file_get_contents($currencyFolder . "curr_eur.txt")];
-$currencyArray += ['GBP' => file_get_contents($currencyFolder . "curr_gbp.txt")];
 
 function getRealCol(int $index) : string
 {
@@ -48,6 +39,67 @@ $newPriceNDS = 0;
 $newPriceRecommended = 0;
 $newTitleCol = 0;
 
+function setRealPrice($money, $currency) {
+    $currencyFolder = ROOT . "/currency/";
+
+    $money = str_replace(',', '.', $money);
+
+    switch ($currency) {
+        case 'USD' : {
+            return $money * file_get_contents($currencyFolder . "curr_usd.txt");
+        }
+        case 'EUR' : {
+            return $money * file_get_contents($currencyFolder . "curr_eur.txt");
+        }
+        case 'GBP' : {
+            return $money * file_get_contents($currencyFolder . "curr_gbp.txt");
+        }
+        default : {
+            return $money;
+        }
+    }
+}
+
+function setPriceWithoutNDS($money) {
+    return $money * 0.76;
+}
+
+function setPriceWithNDS($money) {
+    $nds = 1.2;
+
+    return $money * $nds;
+}
+
+function setPriceRecommended($money) {
+    return $money * 1.2;
+}
+
+function setPriceCells(&$activeSheet, $row, $realPrice, $countColumn, $countValue, $priceWithoutNDSColumn, $priceNDSColumn, $PriceRecommendedColumn) {
+    $activeSheet->setCellValue($countColumn . ($row + 1), $countValue);
+
+    $priceWithoutNDS = setPriceWithoutNDS($realPrice);
+
+    $activeSheet->setCellValueExplicit(
+        $priceWithoutNDSColumn . ($row + 1),
+        str_replace(',', '.', number_format($priceWithoutNDS, 2, thousands_separator: '')),
+        PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING
+    );
+
+    $activeSheet->setCellValueExplicit(
+        $priceNDSColumn . ($row + 1),
+        str_replace(',', '.', number_format(setPriceWithNDS($priceWithoutNDS), 2, thousands_separator: '')),
+        PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING
+    );
+
+    $priceRecommended = setPriceRecommended($realPrice);
+
+    $activeSheet->setCellValueExplicit(
+        $PriceRecommendedColumn . ($row + 1),
+        str_replace(',', '.', number_format($priceRecommended, 2, thousands_separator: '')),
+        PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING
+    );
+}
+
 foreach ($sheetData as $row => $values) {
     if ($row === 0) {
         $header = array_unique($values);
@@ -63,139 +115,72 @@ foreach ($sheetData as $row => $values) {
     } else {
         $xslxProductName = $values[$newTitleCol];
 
-        $warehouse = fopen(ROOT . "/price/tovarnaskladeprice.csv", "r");
-
         $founded = false;
 
-        if (!$founded) {
-            while ($data = fgetcsv($warehouse, separator: "\t")) {
-                if (isset($data[0], $data[1])) {
-                    if (!isset($data[2])) {
-                        $price = 0;
-                    } else {
-                        $price = $data[2];
-                        if (empty($data[2])) {
+        foreach ([
+                ROOT . "/price/tovarnaskladeprice.csv",
+                ROOT . "/price/new-stock-price.csv",
+                ROOT . "/price/defaultprice.csv",
+            ] as $filename) {
+
+            $realPrice = 0;
+
+            $file = fopen($filename, "r");
+
+            while ($data = fgetcsv($file, separator: "\t")) {
+                if (isset($data[0], $data[1], $data[2], $data[3])) {
+
+                    $count = $data[1];
+
+                    switch ($data[2]) {
+                        case !isset($data[2]) :
+                        case empty($data[2]) : {
                             $price = 0;
+                            break;
+                        }
+                        default : {
+                            $price = $data[2];
+                            break;
                         }
                     }
 
-                    if (!isset($data[3])) {
-                        $currency = "RUB";
-                    } else {
-                        $currency = $data[3];
-
-                        if (empty($data[3])) {
+                    switch ($data[3]) {
+                        case !isset($data[3]) :
+                        case empty($data[3]) : {
                             $currency = "RUB";
+                            break;
+                        }
+                        default : {
+                            $currency = $data[3];
+                            break;
                         }
                     }
 
-                    $product = ['title' => $data[0], 'count' => $data[1]];
+                    $realPrice = setRealPrice($price, $currency);
 
-                    if ($product['title'] == $xslxProductName) {
+                    if ($data[0] == $xslxProductName) {
                         $founded = true;
 
-                        $editLog = file_put_contents(ROOT . "/logs/lerdata.log", "ENTERED: " . $xslxProductName . "\n", FILE_APPEND);
+                        $editLog = file_put_contents(ROOT . "/logs/lerdata.log", "ENTERED: in " . basename($filename) . " " . $xslxProductName . "\n", FILE_APPEND);
 
-                        $activeSheet->setCellValue($newCountCol . ($row + 1), $product['count']);
+                        setPriceCells($activeSheet, $row, $realPrice, $newCountCol, $count, $newPriceWithoutNDS, $newPriceNDS, $newPriceRecommended);
 
-                        $recommendedPrice = str_replace(',', '.', $price) * $currencyArray[$currency];
-
-                        $activeSheet->setCellValueExplicit(
-                            $newPriceWithoutNDS . ($row + 1),
-                            str_replace(',', '.', number_format(($recommendedPrice / 1.24) / 1.2, 2, thousands_separator: '')),
-                            PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING
-                        );
-
-                        $activeSheet->setCellValueExplicit(
-                            $newPriceNDS . ($row + 1),
-                            str_replace(',', '.', number_format($recommendedPrice / 1.24, 2, thousands_separator: '')),
-                            PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING
-                        );
-
-                        $activeSheet->setCellValueExplicit(
-                            $newPriceRecommended . ($row + 1),
-                            str_replace(',', '.', number_format($recommendedPrice, 2, thousands_separator: '')),
-                            PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING
-                        );
-
-                        $editLog = file_put_contents(ROOT . "/logs/lerdata.log", "EDITED: " . $xslxProductName . "\n", FILE_APPEND);
+                        $editLog = file_put_contents(ROOT . "/logs/lerdata.log", "EDITED: in " . basename($filename) . " " . $xslxProductName . "\n", FILE_APPEND);
                         break;
                     }
                 }
             }
 
-            fclose($warehouse);
+            fclose($file);
 
             if ($founded) {
-                continue;
+                break;
             }
         }
 
         if (!$founded) {
-            $default = fopen(ROOT . "/price/defaultprice.csv", "r");
-
-            while ($data = fgetcsv($default, separator: "\t")) {
-                if (isset($data[0], $data[1])) {
-                    if (!isset($data[3])) {
-                        $currency = "RUB";
-                    } else {
-                        $currency = $data[3];
-
-                        if (empty($data[3])) {
-                            $currency = "RUB";
-                        }
-                    }
-
-                    if (!isset($data[2])) {
-                        $price = 0;
-                    } else {
-                        $price = $data[2];
-                        if (empty($data[2])) {
-                            $price = 0;
-                        }
-                    }
-
-                    $product = ['title' => $data[0], 'count' => $data[1]];
-
-                    if ($product['title'] == $xslxProductName) {
-                        $founded = true;
-                        $editLog = file_put_contents(ROOT . "/logs/lerdata.log", "ENTERED FROM DEFAULT: " . $xslxProductName . "\n", FILE_APPEND);
-
-                        $activeSheet->setCellValue($newCountCol . ($row + 1), $product['count']);
-
-                        $recommendedPrice = str_replace(',', '.', $price) * $currencyArray[$currency];
-
-                        $activeSheet->setCellValueExplicit(
-                            $newPriceWithoutNDS . ($row + 1),
-                            str_replace(',', '.', number_format(($recommendedPrice / 1.24) / 1.2, 2, thousands_separator: '')),
-                            PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING
-                        );
-
-                        $activeSheet->setCellValueExplicit(
-                            $newPriceNDS . ($row + 1),
-                            str_replace(',', '.', number_format($recommendedPrice / 1.24, 2, thousands_separator: '')),
-                            PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING
-                        );
-
-                        $activeSheet->setCellValueExplicit(
-                            $newPriceRecommended . ($row + 1),
-                            str_replace(',', '.', number_format($recommendedPrice, 2, thousands_separator: '')),
-                            PhpOffice\PhpSpreadsheet\Cell\DataType::TYPE_STRING
-                        );
-
-                        $editLog = file_put_contents(ROOT . "/logs/lerdata.log", "EDITED FROM DEFAULT: " . $xslxProductName . "\n", FILE_APPEND);
-                        break;
-                    }
-                }
-            }
-            fclose($default);
-
-            if ($founded) {
-                continue;
-            }
+            $editLog = file_put_contents(ROOT . "/logs/lerdata.log", "NOT EDITED: " . $xslxProductName . "\n", FILE_APPEND);
         }
-
-        $editLog = file_put_contents(ROOT . "/logs/lerdata.log", "NOT EDITED: " . $xslxProductName . "\n", FILE_APPEND);
     }
 }
 
