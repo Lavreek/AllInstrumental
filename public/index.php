@@ -24,8 +24,14 @@ foreach ($dirs as $dir) {
         if (is_dir($path . $file)) {
             continue;
         }
+        $filesHTML .= sprintf(
+            file_get_contents(__DIR__ . "/html/file.html"),
 
-        $filesHTML .= sprintf(file_get_contents(__DIR__ . "/html/file.html"), mime_content_type($path . $file), base64_encode(file_get_contents($path . $file)), $file, $file);
+            mime_content_type($path . "/" . $file),
+            base64_encode(file_get_contents($path . "/" . $file)),
+            $file,
+            $file
+        );
     }
 
     $endHTML .= sprintf($collapseBlock, $filesHTML);
