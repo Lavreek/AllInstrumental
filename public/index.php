@@ -10,21 +10,25 @@ $dirs = ['processed', 'resources', 'price', 'currency', 'logs'];
 $sample = ['dir' => file_get_contents(__DIR__ . "/html/collapse-block.html")];
 $sample += ['file' => file_get_contents(__DIR__ . "/html/file.html")];
 
-
 foreach ($dirs as $dir) {
     $path = ROOT . "/" . $dir;
     $files = array_diff(scandir($path), ['.', '..']);
+
     $collapseFiles = "";
+    $collapseBlock = str_replace(['[[+TITLE+]]', '[[+ID+]]'], $dir, $sample['dir']);
 
-    $collapseBlock = $sample['dir'];
-    $collapseBlock = str_replace(['[[+TITLE+]]', '[[+ID+]]'], $dir, $collapseBlock);
+    if ($dir === 'processed') {
+        $collapseBlock = str_replace(['[[+SHOW+]]'], 'show', $collapseBlock);
+    } else {
+        $collapseBlock = str_replace(['[[+SHOW+]]'], '', $collapseBlock);
+    }
 
-    $filesHTML = "";
     foreach ($files as $file) {
         if (is_dir($path . $file)) {
             continue;
         }
-        $filesHTML .= sprintf(
+
+        $collapseFiles .= sprintf(
             file_get_contents(__DIR__ . "/html/file.html"),
 
             mime_content_type($path . "/" . $file),
@@ -34,9 +38,7 @@ foreach ($dirs as $dir) {
         );
     }
 
-    $endHTML .= sprintf($collapseBlock, $filesHTML);
+    $endHTML .= sprintf($collapseBlock, $collapseFiles);
 }
-
-
 
 echo sprintf(file_get_contents(__DIR__ . "/html/index.html"), $styleHTML, $endHTML);
