@@ -8,8 +8,11 @@ use PhpOffice\PhpSpreadsheet\IOFactory;
 use PhpOffice\PhpSpreadsheet\Reader\Xlsx as Reader;
 
 $readerInputFile = ROOT . "/resources/SuperAFlow-HyLok-_08.06.23.xlsx";
-$writerOutputFile = ROOT . "/processed/prikat-vseinsrumenti-" . date("d-m-Y--H-i-s") . ".xlsx";
-$editLog = file_put_contents(ROOT . "/logs/vseinsrumenti.log", "Start: " . date("H:i:s d-m-Y") . "\n");
+$writerOutputFile = ROOT . "/processed/". time() ."-prikat-vseinsrumenti-" . date("d-m-Y--H-i-s") . ".xlsx";
+
+$editLog = file_put_contents(
+    ROOT . "/logs/vseinsrumenti.log", "Start: " . date("H:i:s d-m-Y") . "\n"
+);
 
 $reader = new Reader();
 $reader = IOFactory::createReader('Xlsx');

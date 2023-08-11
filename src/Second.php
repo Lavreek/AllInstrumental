@@ -8,7 +8,7 @@ use PhpOffice\PhpSpreadsheet\IOFactory;
 use PhpOffice\PhpSpreadsheet\Reader\Xlsx as Reader;
 
 $readerInputFile = ROOT . "/resources/lerdata.xls";
-$writerOutputFile = ROOT . "/processed/prikat-lerdata-" . date("d-m-Y--H-i-s") . ".xlsx";
+$writerOutputFile = ROOT . "/processed/". time() ."-prikat-lerdata-" . date("d-m-Y--H-i-s") . ".xlsx";
 $editLog = file_put_contents(ROOT . "/logs/lerdata.log", "Start: " . date("H:i:s d-m-Y") . "\n");
 
 $reader = new Reader();

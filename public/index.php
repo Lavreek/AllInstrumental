@@ -1,4 +1,5 @@
 <?php
+ini_set('memory_limit', '512M');
 
 define('ROOT', dirname(__DIR__));
 
@@ -23,14 +24,16 @@ foreach ($dirs as $dir) {
         $collapseBlock = str_replace(['[[+SHOW+]]'], '', $collapseBlock);
     }
 
-    foreach ($files as $file) {
-        if (is_dir($path . $file)) {
+    foreach (array_reverse($files) as $file) {
+        if (
+            is_dir($path . $file)
+            or preg_match('#vseinsrumenti#', $file)
+        ) {
             continue;
         }
 
         $collapseFiles .= sprintf(
             file_get_contents(__DIR__ . "/html/file.html"),
-
             mime_content_type($path . "/" . $file),
             base64_encode(file_get_contents($path . "/" . $file)),
             $file,
